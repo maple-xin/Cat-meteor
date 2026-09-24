@@ -130,6 +130,14 @@
   }
   #title .tag b { color: #4A63D8; }
   #title .credits { margin: 10px 0 0; font-size: 11px; font-weight: 900; color: #1B1B1F; letter-spacing: 1px; }
+  #title .how {
+    margin: 14px 0 0; background: #fff; color: #1B1B1F;
+    border: 4px solid #1B1B1F; border-radius: 14px;
+    box-shadow: 0 4px 0 #1B1B1F;
+    padding: 12px 16px; text-align: left;
+    font-weight: 900; font-size: 11px; letter-spacing: .5px; line-height: 1.55;
+  }
+  #title .how .note { margin-top: 8px; font-size: 9px; color: #555; font-weight: 700; letter-spacing: .3px; line-height: 1.5; }
   #overOv, #finaleOv, #bankOv { background: rgba(27,27,31,.55); }
   #overOv h2, #finaleOv h2 {
     margin: 0; font-weight: 900; font-size: 10.5vmin; line-height: .95;
@@ -218,6 +226,12 @@
   </svg>
   <h1>CAT<br>METEOR<br>CHAIN</h1>
   <p class="tag"><b>&#8212;</b> Drop a cat. It wakes the others. Be polite about it. <b>&#8212;</b></p>
+  <div class="how">
+    <div>1 &#183; TAP TO DROP A CAT FROM THE SKY</div>
+    <div>2 &#183; EACH SLAM BLASTS MORE CATS OUT OF THE GROUND</div>
+    <div>3 &#183; CHAIN THEM TO DRAIN EARTH PATIENCE TO ZERO</div>
+    <div class="note">EVERY EARTH HAS A RANDOM ANTI-CAT COEFFICIENT (MORE CATS, TOUGHER PLANET) &#183; YOUR POCKET REFILLS OVER TIME &#183; WIN MEOW CREDITS FOR PERMANENT UPGRADES IN THE BANK</div>
+  </div>
   <p class="credits" id="titleCredits">MEOW CREDITS 0</p>
   <button class="btn" id="startBtn">START GAME</button>
   <button class="btn ghost" id="bankBtn">MEOW BANK</button>
@@ -226,8 +240,10 @@
 <div id="overOv" class="ov">
   <h2 id="overTitle">CHAIN FIZZLED</h2>
   <p class="sub" id="overSub"></p>
+  <p class="tip">SCORE</p>
   <p class="big" id="overScore">0</p>
   <p class="sub">MEOW CREDITS EARNED: <span id="overCredits">0</span></p>
+  <p class="tip" style="color:#fff">NEXT EARTH = FRESH PLANET, NEW ANTI-CAT COEFFICIENT</p>
   <button class="btn" id="nextBtn">NEXT EARTH</button>
   <button class="btn ghost" id="bankBtn2">MEOW BANK</button>
 </div>
@@ -235,8 +251,10 @@
 <div id="finaleOv" class="ov">
   <h2>EARTH HAS LEFT THE CHAT</h2>
   <p class="sub" id="finaleSub">POLITELY, OF COURSE.</p>
+  <p class="tip">SCORE</p>
   <p class="big" id="finaleScore">0</p>
   <p class="sub">MEOW CREDITS EARNED: <span id="finaleCredits">0</span></p>
+  <p class="tip" style="color:#fff">EARTH PATIENCE HIT ZERO - NEXT ONE HAS A NEW ANTI-CAT COEFFICIENT</p>
   <button class="btn" id="againBtn">NEXT EARTH</button>
   <button class="btn ghost" id="bankBtn3">MEOW BANK</button>
 </div>
@@ -267,7 +285,7 @@ var INK = '#1B1B1F', CREAM = '#F2EDE0', YELLOW = '#F5D93F', BLUE = '#4A63D8',
 
 var TAU = Math.PI * 2;
 var G = 1250;
-var MAXCATS = 150;
+var MAXCATS = 110;
 var MAXPARTS = 320;
 
 /* ================= AUDIO (synth) ================= */
@@ -393,12 +411,14 @@ var lastDropX = 0.5;
 var toastT = 0, toastMsg = '', toastHold = 0;
 var hintT = 0;
 var dieT = 0;
+var coach = { dropped: false, blasted: false, half: false, low: false };
+var blastCd = 0;
 var skyGrad = null, skyKey = -1;
 var stars = [], clouds = [];
 
 function rnd(a, b) { return a + Math.random() * (b - a); }
 function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
-function chainMult() { return 1 + Math.min(chain, 80) * 0.06; }
+function chainMult() { return 1 + Math.min(chain, 50) * 0.04; }
 function chainWindow() { return 1.5 + META.balm * 0.4; }
 
 function newEarth() {
@@ -416,8 +436,8 @@ function newEarth() {
   }
   earth = {
     x: W / 2, y: H * 0.72 + r, r: r, ac: ac,
-    maxHp: Math.round(760 * Math.pow(ac, 1.7)) + 240,
-    hp: Math.round(760 * Math.pow(ac, 1.7)) + 240,
+    maxHp: Math.round(1000 * Math.pow(ac, 1.7)) + 300,
+    hp: Math.round(1000 * Math.pow(ac, 1.7)) + 300,
     blobs: blobs, cracks: cracks, rot: 0, hurtT: 0, spin: rnd(0.02, 0.06) * (Math.random() < 0.5 ? -1 : 1)
   };
 }
@@ -428,12 +448,16 @@ function startRun() {
   cats = []; parts = []; floats = [];
   chain = 0; chainBest = 0; chainTimer = 0; score = 0; shake = 0; flash = 0;
   pocket = pocketMax; pocketT = 0;
-  dieT = 0; skyKey = -1; skyGrad = null;
+  dieT = 0; skyKey = -1; skyGrad = null; blastCd = 0;
+  coach.dropped = false; coach.blasted = false; coach.half = false; coach.low = false;
   st = 'run';
   document.body.classList.add('ingame');
   hideAll();
   var d = earth.ac < 1 ? 'FLINCHY' : (earth.ac < 1.2 ? 'AVERAGE' : (earth.ac < 1.45 ? 'STUBBORN' : 'RUDELY CAT-PROOF'));
-  toast('EARTH ' + META.runs + ': ANTI-CAT x' + earth.ac.toFixed(2) + ' (' + d + ')', 2.6);
+  toast('EARTH ' + META.runs + ': ANTI-CAT x' + earth.ac.toFixed(2) + ' (' + d + ') - TAP TO DROP A CAT', 3);
+  setTimeout(function () {
+    if (st === 'run') toast('EACH SLAM WAKES MORE CATS - CHAIN THEM FOR SCORE', 2.6);
+  }, 3200);
   refreshHUD();
 }
 
@@ -445,16 +469,17 @@ function dropCat(x) {
     x: clamp(x, 40, W - 40), y: -60,
     vx: rnd(-30, 30), vy: 260,
     r: rnd(24, 40), rot: rnd(-0.3, 0.3), vrot: rnd(-2, 2),
-    life: 12, bounces: 0, first: true, expr: 0, dead: false, popT: 0
+    life: 12, bounces: 0, first: true, expr: 0, dead: false, popT: 0, dmgMul: 1
   });
   boing();
   refreshHUD();
 }
 
 function blast(x, y, nx, ny, ch) {
-  var count = 2 + META.paw + Math.round(earth.ac * (1.1 + Math.min(2.2, ch * 0.015)) + rnd(0, 1));
+  var count = 2 + META.paw + Math.round(earth.ac * (1.1 + Math.min(1.2, ch * 0.008)) + rnd(0, 1));
   count = clamp(count, 2, 9);
   if (cats.length >= MAXCATS) count = 1;
+  var mul = 0.25 + Math.min(0.3, ch * 0.004);
   var a0 = Math.atan2(ny, nx);
   for (var i = 0; i < count; i++) {
     if (cats.length >= MAXCATS) break;
@@ -465,7 +490,7 @@ function blast(x, y, nx, ny, ch) {
       vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 40,
       r: rnd(17, 40), rot: rnd(0, TAU), vrot: rnd(-7, 7),
       life: rnd(7.5, 11), bounces: 0, first: false,
-      expr: Math.floor(Math.random() * 3), dead: false, popT: 0
+      expr: Math.floor(Math.random() * 3), dead: false, popT: 0, dmgMul: mul
     });
   }
   boing();
@@ -476,7 +501,8 @@ function doImpact(cat, vn, nx, ny) {
   if (chain > chainBest) chainBest = chain;
   chainTimer = chainWindow();
   var mult = chainMult();
-  var dmg = Math.pow(cat.r / 42, 2) * 5 * mult;
+  var dmg = Math.pow(cat.r / 42, 2) * 4 * mult * (cat.dmgMul || 1);
+  if (!coach.blasted) { coach.blasted = true; toast('THEY WAKE EVEN MORE CATS - KEEP THE CHAIN ALIVE!', 2.4); }
   earth.hp -= dmg;
   score += dmg * 10 * (1 + META.hat * 0.1);
   shake = Math.min(20, shake + 3 + mult * 1.2);
@@ -492,7 +518,7 @@ function doImpact(cat, vn, nx, ny) {
   if (floats.length > 30) floats.shift();
   thud(vn);
   if (Math.random() < 0.5) meow();
-  blast(px, py, nx, ny, chain);
+  if (blastCd <= 0) { blastCd = 0.18; blast(px, py, nx, ny, chain); }
   if (chain === 10) toast('THIS IS GETTING RUDE', 1.6);
   if (chain === 25) toast('GEOLOGY HAS LEFT THE BUILDING', 1.8);
   if (chain === 50) toast('MEOW-TASTROPHE: FIVE-OH', 2);
@@ -540,7 +566,7 @@ var el = {};
 var hudScore = -1, hudChain = -1, hudPocket = -1;
 function refreshHUD() {
   var s = Math.floor(score);
-  if (s !== hudScore) { el.scorepill.textContent = '' + s; hudScore = s; }
+  if (s !== hudScore) { el.scorepill.textContent = 'SCORE ' + s; hudScore = s; }
   if (chain !== hudChain) {
     if (chain > 0) {
       el.chainpill.classList.add('show');
@@ -576,16 +602,17 @@ function endRun(reason) {
   META.credits += earned; saveMeta();
   var isBest = score > META.best;
   if (isBest) { META.best = Math.floor(score); saveMeta(); }
+  var acTxt = earth ? ('ANTI-CAT x' + earth.ac.toFixed(2) + ' \u00B7 ') : '';
   if (destroyed) {
     st = 'finale';
     document.getElementById('finaleScore').textContent = Math.floor(score);
     document.getElementById('finaleCredits').textContent = earned;
-    document.getElementById('finaleSub').textContent = isBest ? 'NEW BEST. THE APOLOGY LETTER IS IN THE MAIL.' : 'POLITELY, OF COURSE.';
+    document.getElementById('finaleSub').textContent = acTxt + 'BEST CHAIN x' + chainBest + (isBest ? ' \u00B7 NEW BEST - THE APOLOGY LETTER IS IN THE MAIL' : ' \u00B7 POLITELY, OF COURSE');
     sad();
     show('finaleOv');
   } else {
     document.getElementById('overTitle').textContent = reason === 'fled' ? 'RAN AWAY POLITELY' : 'CHAIN FIZZLED';
-    document.getElementById('overSub').textContent = isBest ? ('NEW BEST! ' + reason) : ('BEST CHAIN THIS RUN: x' + chainBest);
+    document.getElementById('overSub').textContent = acTxt + 'BEST CHAIN x' + chainBest + (isBest ? ' \u00B7 NEW BEST!' : ' \u00B7 BEST ' + META.best);
     document.getElementById('overScore').textContent = Math.floor(score);
     document.getElementById('overCredits').textContent = earned;
     show('overOv');
@@ -637,6 +664,7 @@ function updateTitleCredits() {
 function update(dt) {
   tGlobal += dt;
   if (st === 'run' || st === 'dying') {
+    if (blastCd > 0) blastCd -= dt;
     chainTimer -= dt;
     if (chainTimer <= 0 && chain > 0) { chain = 0; refreshHUD(); }
     if (st === 'run' && pocket < pocketMax) {
@@ -654,6 +682,8 @@ function update(dt) {
         hintT += dt;
         if (hintT > 2.5) { hintT = 0; toast('POCKET EMPTY - CATS REGENERATING', 1.4); }
       }
+      if (earth && !coach.half && earth.hp < earth.maxHp * 0.6) { coach.half = true; toast('EARTH PATIENCE HALF GONE!', 1.8); }
+      if (earth && !coach.low && earth.hp < earth.maxHp * 0.25) { coach.low = true; toast('ALMOST POLITELY DESTROYED!', 1.8); }
     }
     if (earth) { earth.rot += earth.spin * dt; if (earth.hurtT > 0) earth.hurtT -= dt; }
     // cats
@@ -964,6 +994,24 @@ function draw() {
     ctx.fillText('POLITENESS: ' + lbl, W / 2, H - 122);
     ctx.restore();
     drawBar();
+    ctx.save();
+    ctx.font = '900 9px "Arial Black", Arial';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(27,27,31,0.45)';
+    ctx.fillText('GOAL: DRAIN EARTH PATIENCE TO ZERO - CHAINS = MULTIPLIER', W / 2, H - 142);
+    ctx.restore();
+    if (st === 'run' && !coach.dropped) {
+      ctx.save();
+      ctx.globalAlpha = 0.72 + 0.28 * Math.sin(tGlobal * 5);
+      ctx.font = '900 ' + Math.round(Math.min(W, H) * 0.043) + 'px "Arial Black", Arial';
+      ctx.textAlign = 'center';
+      ctx.lineWidth = 6; ctx.strokeStyle = INK;
+      var ptx = 'TAP ANYWHERE TO DROP A CAT';
+      ctx.strokeText(ptx, W / 2, H * 0.42);
+      ctx.fillStyle = YELLOW;
+      ctx.fillText(ptx, W / 2, H * 0.42);
+      ctx.restore();
+    }
     if (flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,' + (flash * 0.22) + ')';
       ctx.fillRect(0, 0, W, H);
